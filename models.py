@@ -22,7 +22,7 @@ class User:
                  user_id : int | None = None,
                  login_try_count : int | None = None
                  ):
-        self.id = user_id
+        self.user_id = user_id
         self.username = username
         self.password = password
         self.role = role or UserRole.USER.value
@@ -31,6 +31,18 @@ class User:
     
     def __str__(self):
         return self.username
+    
+    @staticmethod
+    def from_tuple(data:tuple):
+        return User(
+            user_id = data[0],
+            username = data[1],
+            password = data[2],
+            email = data[3],
+            role = data[4],
+            login_try_count= data[5]
+        
+        )
     
     
 class Todo:

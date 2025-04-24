@@ -20,3 +20,8 @@ def match_password(raw_password : str,encoded_password : str):
     return is_correct
 
 
+
+class Response:
+    def __init__(self,message : str , status_code = 200):
+        self.message = message
+        self.status_code = status_code

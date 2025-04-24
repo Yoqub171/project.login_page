@@ -73,7 +73,3 @@ def insert_admin_user():
     print('Admin created ! ')
     
 # insert_admin_user()
-
-if __name__ == "__main__":
-    from service import login_page
-    login_page("ADMIN", "admin123")
