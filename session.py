@@ -17,5 +17,7 @@ class Session:
     def add_session(self,user:User):
         self.session = user
         
+    def remove_session(self):
+        self.session = None
         
-    
+        

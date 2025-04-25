@@ -1,10 +1,41 @@
 from session import Session
-from models import User, UserRole
-from utils import Response,match_password, hash_password
+from models import User,UserRole,TodoType,Todo
+from utils import Response,match_password,hash_password
 from database import cursor,commit
+from validations import check_validations
+from forms import UserForm
+
 
 
 session = Session()
+
+
+# =========================== Decorator ========================
+
+def login_required(func):
+    def wrapper(*args,**kwargs):
+        if not session.session:
+            return Response('You must login firstly',status_code=401)
+        result = func(*args,**kwargs)
+        return result
+    return wrapper
+
+
+
+def is_admin(func):
+    def wrapper(*args,**kwargs):
+        if session.session:
+            if session.session.role != 'admin':
+                return Response('You dont have any permisson for admin role',status_code=401)
+        result = func(*args,**kwargs)
+        return result
+    
+    return wrapper
+                
+
+# =============================================================
+
+
 
 @commit
 def login(username:str,password:str):
@@ -32,48 +63,89 @@ def login(username:str,password:str):
     return Response('You successfully logged in ✅✅✅')
     
 
+
 # response = login('ADMIN','admin1234')
 # print(response.message)
 
 
 @commit
-def register_user(username: str, password: str, email: str = None):
-    user: Session | None = session.check_session()
+def register(username,password):
+    form = UserForm(username,password)
+    check_validations(form)
+    user_query= '''
+        select * from users where username = %s;
+    '''
+    cursor.execute(user_query,(username,))
+    user_data = cursor.fetchone()
+    if user_data:
+        return Response('You already registered',status_code=404)
+    create_user_query = '''
+        insert into users(username,password,role,email,login_try_count)
+        values(%s,%s,%s,%s,%s);
+    '''
+    data = (username,hash_password(password),UserRole.USER.value,None,0)
+    cursor.execute(create_user_query,data)
+    return Response('Successfully registered✅✅',status_code=201)
+    
+    
+# response = register('jasur','123')
+# print(response.message)
+
+def logout():
+    if session.session:
+        # session.session = None
+        session.remove_session()
+        return Response('You Successfully Logged Out✅✅')
+    
+    return Response('You must login firstly')
+
+
+def todo_list():
+    select_todo_list_query = '''select * from todo;'''
+    cursor.execute(select_todo_list_query)
+    todos = cursor.fetchall()
+    for todo in todos:
+        print(todo)
+        
+        
+
+@login_required
+@is_admin
+@commit
+def todo_add(title,user_id):
+    insert_todo_query = '''insert into todo(title,description,todo_type,user_id) values (%s,%s,%s,%s);'''
+    todo_data = (title,None,TodoType.PERSONAL.value,user_id)
+    cursor.execute(insert_todo_query,todo_data)
+    return Response('Todo Succesfully created ✅✅')
+    
+    
+
+
+@login_required
+@is_admin
+def make_admin(username):
+    user = next((u for u in user_db if u.username == username), None)
     if user:
-        return Response(message='You are already logged in', status_code=401)
-
-    check_user_query = '''
-        SELECT * FROM users WHERE username = %s;
-    '''
-    cursor.execute(check_user_query, (username,))
-    existing_user = cursor.fetchone()
-    if existing_user:
-        return Response(message='Username already exists', status_code=400)
-
-    hashed_password = hash_password(password)
-
-    insert_user_query = '''
-        INSERT INTO users (username, password, email, role, login_try_count)
-        VALUES (%s, %s, %s, %s, 0);
-    '''
-    cursor.execute(insert_user_query, (
-        username,
-        hashed_password,
-        email,
-        UserRole.USER.value
-    ))
-
-    return Response(message='User registered successfully ✅')
+        user.role = 'admin'
+        return Response(True, f"{username} endi admin bo'ldi.")
+    return Response(False, "Bunday foydalanuvchi topilmadi.")
 
 
-def register():
-    print("Ro'yxatdan o'tish")
-    username = input("Foydalanuvchi nomi: ")
-    password = input("Parol: ")
-    email = input("Email: ") or None
+@login_required
+def todo_update(todo_id, new_title):
+    todo = next((t for t in todos if t.id == todo_id), None)
+    if todo:
+        todo.title = new_title
+        return Response(True, "Todo yangilandi.")
+    return Response(False, "Todo topilmadi.")
 
-    response = register_user(username, password, email)
-    print(response.message)
+@login_required
+def todo_delete(todo_id):
+    global todos
+    todo = next((t for t in todos if t.id == todo_id), None)
+    if todo:
+        todos.remove(todo)
+        return Response(True, "Todo ochirildi.")
+    return Response(False, "Todo topilmadi.")
 
 
-register()
